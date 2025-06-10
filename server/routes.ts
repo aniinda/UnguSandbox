@@ -4,7 +4,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { storage } from "./storage";
+import { extractRateCardDataOpenAI } from "./openai";
 
 import { Router } from 'express';
 const router = Router();
@@ -12,6 +14,11 @@ const router = Router();
 // Anthropic setup
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY_ENV_VAR || "default_key",
+});
+
+// OpenAI setup
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Multer setup for file uploads
@@ -56,7 +63,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const { mediaOwner = 'Unknown', notes = '' } = req.body;
+      const { mediaOwner = 'Unknown', notes = '', aiProvider = 'anthropic' } = req.body;
       const filePath = req.file.path;
       const fileName = req.file.originalname;
       const fileExt = path.extname(fileName).toLowerCase();
@@ -88,9 +95,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extractedText = result.value;
         }
 
-        // Process with Anthropic Claude
-        // the newest Anthropic model is "claude-sonnet-4-20250514" which was released May 14, 2025. Use this by default unless user has already selected claude-3-7-sonnet-20250219
-        const prompt = `
+        // Process with selected AI provider
+        let results = [];
+        
+        if (aiProvider === 'openai') {
+          // Use OpenAI for extraction
+          try {
+            const openaiResults = await extractRateCardDataOpenAI(extractedText);
+            // Convert OpenAI format to our standard format
+            results = [];
+            if (openaiResults.mediaTypes) {
+              for (const mediaType of openaiResults.mediaTypes) {
+                for (const placement of mediaType.placements || []) {
+                  results.push({
+                    mediaType: mediaType.type,
+                    mediaFormat: placement.size || placement.name,
+                    placementName: placement.name,
+                    dimensions: placement.size,
+                    costMedia4weeks: placement.baseRate ? `${placement.currency || '$'}${placement.baseRate}` : null,
+                    productionCost: placement.discountedRate ? `${placement.currency || '$'}${placement.discountedRate}` : null,
+                    totalCost: placement.baseRate ? `${placement.currency || '$'}${placement.baseRate}` : null,
+                    notes: placement.notes || openaiResults.additionalTerms,
+                    confidence: "medium"
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error('OpenAI processing error:', error);
+            throw error;
+          }
+        } else {
+          // Use Anthropic Claude (default)
+          // the newest Anthropic model is "claude-sonnet-4-20250514" which was released May 14, 2025. Use this by default unless user has already selected claude-3-7-sonnet-20250219
+          const prompt = `
 You are a data extraction specialist. Extract rate card information from this document text.
 
 Extract the following information for each advertising placement:
@@ -122,23 +160,23 @@ Document text:
 ${extractedText}
 `;
 
-        const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: prompt }],
-        });
+          const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 4000,
+            messages: [{ role: 'user', content: prompt }],
+          });
 
-        let results = [];
-        try {
-          const content = response.content[0];
-          if (content.type === 'text') {
-            const jsonMatch = content.text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              results = JSON.parse(jsonMatch[0]);
+          try {
+            const content = response.content[0];
+            if (content.type === 'text') {
+              const jsonMatch = content.text.match(/\[[\s\S]*\]/);
+              if (jsonMatch) {
+                results = JSON.parse(jsonMatch[0]);
+              }
             }
+          } catch (parseError) {
+            console.error('Error parsing Claude response:', parseError);
           }
-        } catch (parseError) {
-          console.error('Error parsing Claude response:', parseError);
         }
 
         // Save results to database
