@@ -12,7 +12,10 @@ import {
   Eye,
   Download,
   ArrowUp,
-  Clock
+  Clock,
+  Brain,
+  Zap,
+  Settings
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -20,6 +23,13 @@ export default function Dashboard() {
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['/api/data-engineer/jobs'],
     queryFn: () => dataEngineerApi.getJobs(),
+  });
+
+  const { data: providers } = useQuery({
+    queryKey: ['/api/data-engineer/providers'],
+    queryFn: () => fetch('/api/data-engineer/providers', {
+      headers: { 'Authorization': 'Bearer data_engineer_test_token' }
+    }).then(res => res.json()),
   });
 
   const totalJobs = jobs?.length || 0;
@@ -150,6 +160,40 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Providers Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Settings className="w-5 h-5 mr-2" />
+            AI Processing Engines
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {providers?.map((provider: any) => (
+              <div key={provider.id} className="flex items-center p-4 border rounded-lg bg-green-50 border-green-200">
+                <div className="flex-shrink-0 mr-3">
+                  {provider.id === 'anthropic' ? (
+                    <Brain className="w-6 h-6 text-blue-600" />
+                  ) : (
+                    <Zap className="w-6 h-6 text-green-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-900">{provider.name}</h4>
+                  <p className="text-sm text-gray-600">{provider.description}</p>
+                </div>
+                <Badge className="bg-green-100 text-green-800">Available</Badge>
+              </div>
+            )) || (
+              <div className="text-center py-4 text-gray-500">
+                Loading AI providers...
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Jobs Table */}
       <Card>
