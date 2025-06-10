@@ -6,6 +6,16 @@ import { Database, Shield } from "lucide-react";
 export default function LoginPage() {
   const { login } = useAuth();
 
+  const handleLogin = () => {
+    console.log('Login button clicked');
+    try {
+      login();
+      console.log('Login function executed');
+    } catch (error) {
+      console.error('Login error:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <Card className="w-full max-w-md">
@@ -18,21 +28,21 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center">
-                <Shield className="w-5 h-5 text-blue-600 mr-2" />
-                <span className="text-sm text-blue-800">Authorized Access Only</span>
+                <Shield className="w-5 h-5 text-green-600 mr-2" />
+                <span className="text-sm text-green-800">Development Sandbox</span>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                This portal is restricted to authorized data engineers
+              <p className="text-xs text-green-600 mt-1">
+                Testing environment for the Ungu Data Engineer Portal
               </p>
             </div>
             
             <Button 
-              onClick={login} 
+              onClick={handleLogin} 
               className="w-full bg-primary hover:bg-blue-700"
             >
-              Access Data Engineer Portal
+              Enter Development Portal
             </Button>
             
             <div className="text-center">
