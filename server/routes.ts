@@ -230,6 +230,36 @@ ${extractedText}
     }
   });
 
+  // Get available AI providers
+  app.get('/api/data-engineer/providers', authenticateDataEngineer, async (req, res) => {
+    try {
+      const providers = [];
+      
+      if (process.env.ANTHROPIC_API_KEY) {
+        providers.push({
+          id: 'anthropic',
+          name: 'Anthropic Claude Sonnet 4',
+          description: 'Advanced document analysis with superior reasoning',
+          available: true
+        });
+      }
+      
+      if (process.env.OPENAI_API_KEY) {
+        providers.push({
+          id: 'openai', 
+          name: 'OpenAI GPT-4o',
+          description: 'Fast structured extraction with vision capabilities',
+          available: true
+        });
+      }
+      
+      res.json(providers);
+    } catch (error) {
+      console.error('Error fetching providers:', error);
+      res.status(500).json({ error: 'Failed to fetch available providers' });
+    }
+  });
+
   // Get processing jobs
   app.get('/api/data-engineer/jobs', authenticateDataEngineer, async (req, res) => {
     try {

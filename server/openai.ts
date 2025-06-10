@@ -48,7 +48,7 @@ export async function extractRateCardDataOpenAI(text: string): Promise<any> {
     return result;
   } catch (error) {
     console.error("OpenAI extraction error:", error);
-    throw new Error("Failed to extract rate card data using OpenAI: " + error.message);
+    throw new Error("Failed to extract rate card data using OpenAI: " + (error instanceof Error ? error.message : String(error)));
   }
 }
 
@@ -79,6 +79,6 @@ export async function analyzeImageOpenAI(base64Image: string): Promise<string> {
     return visionResponse.choices[0].message.content || '';
   } catch (error) {
     console.error("OpenAI image analysis error:", error);
-    throw new Error("Failed to analyze image using OpenAI: " + error.message);
+    throw new Error("Failed to analyze image using OpenAI: " + (error instanceof Error ? error.message : String(error)));
   }
 }

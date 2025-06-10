@@ -6,14 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { dataEngineerApi } from "@/lib/api";
-import { CloudUpload, FileText, Settings, CheckCircle, AlertCircle } from "lucide-react";
+import { CloudUpload, FileText, Settings, CheckCircle, AlertCircle, Brain, Zap } from "lucide-react";
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [mediaOwner, setMediaOwner] = useState("");
   const [notes, setNotes] = useState("");
+  const [aiProvider, setAiProvider] = useState("anthropic");
   const [dragActive, setDragActive] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -31,6 +33,7 @@ export default function Upload() {
       setFile(null);
       setMediaOwner("");
       setNotes("");
+      setAiProvider("anthropic");
       // Refresh jobs list
       queryClient.invalidateQueries({ queryKey: ['/api/data-engineer/jobs'] });
     },
@@ -125,6 +128,7 @@ export default function Upload() {
     formData.append('file', file);
     formData.append('mediaOwner', mediaOwner);
     formData.append('notes', notes);
+    formData.append('aiProvider', aiProvider);
 
     uploadMutation.mutate(formData);
   };
@@ -209,6 +213,29 @@ export default function Upload() {
                   onChange={(e) => setMediaOwner(e.target.value)}
                   required
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="aiProvider">AI Processing Engine</Label>
+                <Select value={aiProvider} onValueChange={setAiProvider}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select AI provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anthropic">
+                      <div className="flex items-center">
+                        <Brain className="w-4 h-4 mr-2" />
+                        Anthropic Claude Sonnet 4 - Advanced document analysis
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="openai">
+                      <div className="flex items-center">
+                        <Zap className="w-4 h-4 mr-2" />
+                        OpenAI GPT-4o - Fast structured extraction
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
