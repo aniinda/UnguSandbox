@@ -1,0 +1,505 @@
+# Complete Data Engineer Portal Migration Package
+
+Copy each file below into your new Replit project:
+
+## 1. package.json
+```json
+{
+  "name": "ungu-data-engineer-portal",
+  "version": "1.0.0",
+  "description": "Isolated data engineer portal for rate card processing",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx server/index.ts",
+    "build": "tsc && vite build",
+    "start": "node dist/server/index.js",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.20.0",
+    "@neondatabase/serverless": "^0.9.0",
+    "drizzle-orm": "^0.30.4",
+    "drizzle-zod": "^0.5.1",
+    "express": "^4.19.2",
+    "mammoth": "^1.7.1",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "tsx": "^4.7.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.11.30",
+    "@types/pdf-parse": "^1.1.4",
+    "drizzle-kit": "^0.20.14",
+    "typescript": "^5.4.2"
+  }
+}
+```
+
+## 2. tsconfig.json
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": false,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["server/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+## 3. drizzle.config.ts
+```typescript
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './shared/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!
+  }
+});
+```
+
+## 4. .env.example
+```
+DATABASE_URL=your_postgres_database_url_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+PORT=5000
+NODE_ENV=development
+```
+
+## 5. shared/schema.ts
+```typescript
+import { pgTable, serial, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { createInsertSchema } from 'drizzle-zod';
+import { z } from 'zod';
+
+export const processingJobs = pgTable('processing_jobs', {
+  id: serial('id').primaryKey(),
+  jobType: text('job_type').notNull(),
+  fileName: text('file_name').notNull(),
+  mediaOwner: text('media_owner').notNull(),
+  status: text('status').notNull().default('pending'),
+  progress: integer('progress').default(0),
+  totalChunks: integer('total_chunks').default(0),
+  processedChunks: integer('processed_chunks').default(0),
+  resultData: jsonb('result_data'),
+  errorMessage: text('error_message'),
+  extractionNotes: text('extraction_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const ratecardEntries = pgTable('ratecard_entries', {
+  id: serial('id').primaryKey(),
+  jobId: integer('job_id').references(() => processingJobs.id),
+  originalFileName: text('original_file_name').notNull(),
+  sourcePage: integer('source_page'),
+  mediaType: text('media_type'),
+  mediaFormat: text('media_format'),
+  placementName: text('placement_name'),
+  dimensions: text('dimensions'),
+  costMedia4weeks: text('cost_media_4weeks'),
+  productionCost: text('production_cost'),
+  totalCost: text('total_cost'),
+  notes: text('notes'),
+  confidence: text('confidence').default('medium'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const insertProcessingJobSchema = createInsertSchema(processingJobs);
+export const insertRatecardEntrySchema = createInsertSchema(ratecardEntries);
+
+export type ProcessingJob = typeof processingJobs.$inferSelect;
+export type NewProcessingJob = z.infer<typeof insertProcessingJobSchema>;
+export type RatecardEntry = typeof ratecardEntries.$inferSelect;
+export type NewRatecardEntry = z.infer<typeof insertRatecardEntrySchema>;
+```
+
+## 6. server/index.ts
+```typescript
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import cors from 'cors';
+import dataEngineerRoutes from './routes/dataEngineerRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Enable trust proxy for real IP addresses
+app.set('trust proxy', true);
+
+// API Routes
+app.use('/api/data-engineer', dataEngineerRoutes);
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve standalone HTML
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/standalone.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Data Engineer Portal running on port ${PORT}`);
+  console.log(`Access at: http://localhost:${PORT}`);
+});
+```
+
+## 7. server/routes/dataEngineerRoutes.ts
+```typescript
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
+import Anthropic from '@anthropic-ai/sdk';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import { processingJobs, ratecardEntries, insertProcessingJobSchema, insertRatecardEntrySchema } from '../../shared/schema.js';
+import { eq, desc } from 'drizzle-orm';
+
+const router = express.Router();
+
+// Database setup
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
+
+// Anthropic setup
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+// Multer setup for file uploads
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.doc', '.docx'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, DOC, and DOCX files are allowed.'));
+    }
+  }
+});
+
+// Authentication middleware
+const authenticateDataEngineer = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader !== "Bearer data_engineer_test_token") {
+    return res.status(401).json({ error: "Unauthorized access" });
+  }
+  next();
+};
+
+// Apply authentication to all routes
+router.use(authenticateDataEngineer);
+
+// File upload and processing
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { mediaOwner = 'Unknown' } = req.body;
+    const filePath = req.file.path;
+    const fileName = req.file.originalname;
+    const fileExt = path.extname(fileName).toLowerCase();
+
+    // Create processing job
+    const [job] = await db.insert(processingJobs).values({
+      jobType: 'rate_card_extraction',
+      fileName,
+      mediaOwner,
+      status: 'processing',
+      progress: 0,
+      totalChunks: 1,
+      processedChunks: 0,
+    }).returning();
+
+    // Extract text based on file type
+    let extractedText = '';
+    
+    if (fileExt === '.pdf') {
+      const dataBuffer = fs.readFileSync(filePath);
+      const data = await pdfParse(dataBuffer);
+      extractedText = data.text;
+    } else if (fileExt === '.docx' || fileExt === '.doc') {
+      const result = await mammoth.extractRawText({ path: filePath });
+      extractedText = result.value;
+    }
+
+    // Process with Anthropic Claude
+    const prompt = `
+You are a data extraction specialist. Extract rate card information from this document text.
+
+Extract the following information for each advertising placement:
+- Media Type (Print, Digital, Radio, TV, etc.)
+- Media Format (Full Page, Half Page, Banner, etc.)
+- Placement Name
+- Dimensions
+- Cost for 4 weeks of media
+- Production Cost
+- Total Cost
+- Any special notes
+
+Return the data as a JSON array with this structure:
+[
+  {
+    "mediaType": "Print",
+    "mediaFormat": "Full Page",
+    "placementName": "Premium Placement",
+    "dimensions": "210mm x 297mm",
+    "costMedia4weeks": "$5,000",
+    "productionCost": "$800",
+    "totalCost": "$5,800",
+    "notes": "Prime position",
+    "confidence": "high"
+  }
+]
+
+Document text:
+${extractedText}
+`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-3-sonnet-20240229',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    let results = [];
+    try {
+      const content = response.content[0];
+      if (content.type === 'text') {
+        const jsonMatch = content.text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          results = JSON.parse(jsonMatch[0]);
+        }
+      }
+    } catch (parseError) {
+      console.error('Error parsing Claude response:', parseError);
+    }
+
+    // Save results to database
+    for (const result of results) {
+      await db.insert(ratecardEntries).values({
+        jobId: job.id,
+        originalFileName: fileName,
+        ...result,
+      });
+    }
+
+    // Update job status
+    await db.update(processingJobs)
+      .set({
+        status: 'completed',
+        progress: 100,
+        processedChunks: 1,
+        resultData: results,
+      })
+      .where(eq(processingJobs.id, job.id));
+
+    // Clean up uploaded file
+    fs.unlinkSync(filePath);
+
+    res.json({
+      jobId: job.id,
+      status: 'completed',
+      results: results.length,
+      message: `Successfully extracted ${results.length} rate card entries`
+    });
+
+  } catch (error) {
+    console.error('Upload processing error:', error);
+    res.status(500).json({ 
+      error: 'Processing failed', 
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get processing jobs
+router.get('/jobs', async (req, res) => {
+  try {
+    const jobs = await db.select()
+      .from(processingJobs)
+      .orderBy(desc(processingJobs.createdAt))
+      .limit(50);
+
+    res.json(jobs);
+  } catch (error) {
+    console.error('Error fetching jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+// Get job details with results
+router.get('/jobs/:id', async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    
+    const [job] = await db.select()
+      .from(processingJobs)
+      .where(eq(processingJobs.id, jobId));
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const results = await db.select()
+      .from(ratecardEntries)
+      .where(eq(ratecardEntries.jobId, jobId));
+
+    res.json({ ...job, results });
+  } catch (error) {
+    console.error('Error fetching job details:', error);
+    res.status(500).json({ error: 'Failed to fetch job details' });
+  }
+});
+
+// Export results as CSV
+router.get('/jobs/:id/export', async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    
+    const results = await db.select()
+      .from(ratecardEntries)
+      .where(eq(ratecardEntries.jobId, jobId));
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'No results found for this job' });
+    }
+
+    const headers = [
+      'Media Type', 'Media Format', 'Placement Name', 'Dimensions',
+      'Media Cost (4 weeks)', 'Production Cost', 'Total Cost', 'Notes', 'Confidence'
+    ];
+
+    const csvRows = [
+      headers.join(','),
+      ...results.map(r => [
+        r.mediaType || '',
+        r.mediaFormat || '',
+        r.placementName || '',
+        r.dimensions || '',
+        r.costMedia4weeks || '',
+        r.productionCost || '',
+        r.totalCost || '',
+        r.notes || '',
+        r.confidence || ''
+      ].map(field => `"${field}"`).join(','))
+    ];
+
+    const csvContent = csvRows.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="rate_card_results.csv"');
+    res.send(csvContent);
+
+  } catch (error) {
+    console.error('Error exporting results:', error);
+    res.status(500).json({ error: 'Failed to export results' });
+  }
+});
+
+export default router;
+```
+
+## 8. public/standalone.html
+Copy the complete standalone.html file that was created earlier - it's a fully functional React app with authentication, file upload, and results display.
+
+## 9. README.md
+```markdown
+# Ungu Data Engineer Portal
+
+Isolated rate card processing portal for data engineers.
+
+## Setup Instructions
+
+1. Create a new Replit Node.js project
+2. Copy all files from this migration package
+3. Install dependencies: `npm install`
+4. Set up environment variables in `.env`:
+   - `DATABASE_URL`: Your PostgreSQL database URL
+   - `ANTHROPIC_API_KEY`: Your Anthropic API key
+   - `PORT`: Server port (default: 5000)
+5. Push database schema: `npm run db:push`
+6. Start the application: `npm run dev`
+
+## Features
+
+- Secure token-based authentication
+- PDF and DOCX file upload
+- AI-powered rate card data extraction
+- Processing job monitoring
+- CSV export functionality
+- Responsive web interface
+
+## Authentication
+
+Use the token: `data_engineer_test_token`
+
+## Database
+
+The application uses PostgreSQL with two main tables:
+- `processing_jobs`: Tracks file processing jobs
+- `ratecard_entries`: Stores extracted rate card data
+
+## Security
+
+This is a completely isolated application with no connection to the main Ungu platform, ensuring complete security separation.
+```
+
+---
+
+## Setup Steps for New Replit Project:
+
+1. **Create new Node.js Replit project**
+2. **Copy all files above** into the respective directories
+3. **Install dependencies**: Run `npm install`
+4. **Set environment variables** in Replit Secrets:
+   - `DATABASE_URL`
+   - `ANTHROPIC_API_KEY`
+5. **Push database schema**: Run `npm run db:push`
+6. **Start the application**: Run `npm run dev`
+
+The application will be completely isolated with its own database and authentication system.
