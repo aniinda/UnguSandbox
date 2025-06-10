@@ -3,12 +3,11 @@ import { createServer, type Server } from "http";
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
 import Anthropic from '@anthropic-ai/sdk';
 import { storage } from "./storage";
 
-const router = require('express').Router();
+import { Router } from 'express';
+const router = Router();
 
 // Anthropic setup
 const anthropic = new Anthropic({
@@ -79,10 +78,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         if (fileExt === '.pdf') {
+          const { default: pdfParse } = await import('pdf-parse');
           const dataBuffer = fs.readFileSync(filePath);
           const data = await pdfParse(dataBuffer);
           extractedText = data.text;
         } else if (fileExt === '.docx' || fileExt === '.doc') {
+          const mammoth = await import('mammoth');
           const result = await mammoth.extractRawText({ path: filePath });
           extractedText = result.value;
         }
