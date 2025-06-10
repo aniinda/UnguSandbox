@@ -7,13 +7,7 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   const handleLogin = () => {
-    console.log('Login button clicked');
-    try {
-      login();
-      console.log('Login function executed');
-    } catch (error) {
-      console.error('Login error:', error);
-    }
+    login();
   };
 
   return (
