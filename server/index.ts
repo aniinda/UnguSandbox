@@ -1,8 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import fs from "fs";
 
 const app = express();
+
+// Ensure the uploads directory exists so multer can save files
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads", { recursive: true });
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
