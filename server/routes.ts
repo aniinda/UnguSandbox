@@ -57,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File upload and processing
-  app.post('/api/data-engineer/upload', authenticateDataEngineer, upload.single('file'), async (req, res) => {
+  app.post('/api/data-engineer/upload', upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -231,7 +231,7 @@ ${extractedText}
   });
 
   // Get available AI providers
-  app.get('/api/data-engineer/providers', authenticateDataEngineer, async (req, res) => {
+  app.get('/api/data-engineer/providers', async (req, res) => {
     try {
       const providers = [];
       
@@ -261,7 +261,7 @@ ${extractedText}
   });
 
   // Get processing jobs
-  app.get('/api/data-engineer/jobs', authenticateDataEngineer, async (req, res) => {
+  app.get('/api/data-engineer/jobs', async (req, res) => {
     try {
       const jobs = await storage.getProcessingJobs(50);
       res.json(jobs);
@@ -272,7 +272,7 @@ ${extractedText}
   });
 
   // Get job details with results
-  app.get('/api/data-engineer/jobs/:id', authenticateDataEngineer, async (req, res) => {
+  app.get('/api/data-engineer/jobs/:id', async (req, res) => {
     try {
       const jobId = parseInt(req.params.id);
       
@@ -290,7 +290,7 @@ ${extractedText}
   });
 
   // Get all results
-  app.get('/api/data-engineer/results', authenticateDataEngineer, async (req, res) => {
+  app.get('/api/data-engineer/results', async (req, res) => {
     try {
       const results = await storage.getAllRatecardEntries();
       res.json(results);
