@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { storage } from "./storage";
 import { extractRateCardDataOpenAI } from "./openai";
+import { log } from "./vite";
 
 import { Router } from 'express';
 const router = Router();
@@ -67,6 +68,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = req.file.path;
       const fileName = req.file.originalname;
       const fileExt = path.extname(fileName).toLowerCase();
+
+      log(`uploaded ${fileName} for ${mediaOwner}`, 'upload');
 
       // Create processing job
       const job = await storage.createProcessingJob({
