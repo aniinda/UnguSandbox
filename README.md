@@ -119,7 +119,7 @@ npm run db:push
 ## File Upload Processing Flow
 
 1. **Upload** (`POST /api/data-engineer/upload`)
-   - Accepts PDF, DOC, DOCX files
+   - Accepts PDF, DOC, DOCX, XLS, XLSX files
    - Creates processing job in database
    - Extracts text from document
    - Processes with selected AI provider
