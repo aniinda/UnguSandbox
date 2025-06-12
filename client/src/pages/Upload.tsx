@@ -79,13 +79,19 @@ export default function Upload() {
   };
 
   const validateFile = (file: File) => {
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
     const maxSize = 50 * 1024 * 1024; // 50MB
 
     if (!allowedTypes.includes(file.type)) {
       toast({
         title: "Invalid File Type",
-        description: "Only PDF, DOC, and DOCX files are allowed",
+        description: "Only PDF, DOC, DOCX, XLS, and XLSX files are allowed",
         variant: "destructive",
       });
       return false;
@@ -147,7 +153,7 @@ export default function Upload() {
             <CloudUpload className="w-8 h-8 text-gray-400" />
           </div>
           <CardTitle>Upload Rate Card Document</CardTitle>
-          <p className="text-gray-600">Supports PDF, DOC, and DOCX files up to 50MB</p>
+          <p className="text-gray-600">Supports PDF, DOC, DOCX, XLS, and XLSX files up to 50MB</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,7 +202,7 @@ export default function Upload() {
                 id="file-upload"
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.doc,.docx,.xls,.xlsx"
                 onChange={handleFileSelect}
               />
             </div>

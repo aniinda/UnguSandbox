@@ -26,12 +26,12 @@ const upload = multer({
   dest: 'uploads/',
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['.pdf', '.doc', '.docx'];
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only PDF, DOC, and DOCX files are allowed.'));
+      cb(new Error('Invalid file type. Only PDF, DOC, DOCX, XLS, and XLSX files are allowed.'));
     }
   }
 });
@@ -93,6 +93,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const mammoth = await import('mammoth');
           const result = await mammoth.extractRawText({ path: filePath });
           extractedText = result.value;
+        } else if (fileExt === '.xls' || fileExt === '.xlsx') {
+          const xlsx = await import('xlsx');
+          const workbook = xlsx.readFile(filePath);
+          const sheetTexts = workbook.SheetNames.map((name: string) =>
+            xlsx.utils.sheet_to_csv(workbook.Sheets[name])
+          );
+          extractedText = sheetTexts.join('\n');
         }
 
         // Process with selected AI provider
