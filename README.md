@@ -135,7 +135,7 @@ npm run db:push
 
 ### File Upload Errors
 - Check file path handling in routes.ts
-- Ensure uploads/ directory exists
+- `uploads/` directory is created automatically if missing
 - Verify file type validation
 
 ### AI Processing Errors
